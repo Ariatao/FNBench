@@ -1,10 +1,13 @@
 import copy
+import json
+
 import numpy as np
 import random
 import time
 from datetime import datetime
 import os
 
+import swanlab
 import torchvision
 import torch
 from torch.utils.data import DataLoader
@@ -26,8 +29,9 @@ if __name__ == '__main__':
 
     start = time.time()
     args = args_parser()
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
     args.device = torch.device(
-        'cuda:{}'.format(args.gpu)
+        'cuda'
         if torch.cuda.is_available() and args.gpu != -1
         else 'cpu',
     )
@@ -95,35 +99,53 @@ if __name__ == '__main__':
 
 
 
-    if args.partition == 'shard':  # non-iid
-        if(args.dataset == 'cifar10'):
-            # 5 classes for a client at most (total clients=100)
-            args.num_shards = 500
-        elif(args.dataset == 'cifar100'):
-            # 20 classes for a client at most (total clients=100)
-            args.num_shards = 2000
+    # if args.partition == 'shard':  # non-iid
+    #     if(args.dataset == 'cifar10'):
+    #         # 5 classes for a client at most (total clients=100)
+    #         args.num_shards = 500
+    #     elif(args.dataset == 'cifar100'):
+    #         # 20 classes for a client at most (total clients=100)
+    #         args.num_shards = 2000
+    #
+    #     print("[Partitioning Via Sharding....]")
+    #     dict_users = sample_noniid_shard(
+    #         labels=np.array(dataset_train.train_labels),
+    #         num_users=args.num_users,
+    #         num_shards=args.num_shards,
+    #     )
+    #
+    # elif args.partition == 'dirichlet':
+    #     print("[Partitioning Via Dir....]")
+    #     dict_users = sample_dirichlet(
+    #         labels=np.array(dataset_train.train_labels),
+    #         num_clients=args.num_users,
+    #         alpha=args.dd_alpha,
+    #         num_classes=args.num_classes,
+    #     )
+    # else:
+    #     print("[Partitioning Via IID....]")
+    #     dict_users = sample_iid(
+    #         labels=np.array(dataset_train.train_labels),
+    #         num_users=args.num_users,
+    #     )
 
-        print("[Partitioning Via Sharding....]")
-        dict_users = sample_noniid_shard(
-            labels=np.array(dataset_train.train_labels),
-            num_users=args.num_users,
-            num_shards=args.num_shards,
-        )
-
-    elif args.partition == 'dirichlet':
-        print("[Partitioning Via Dir....]")
-        dict_users = sample_dirichlet(
-            labels=np.array(dataset_train.train_labels),
-            num_clients=args.num_users,
-            alpha=args.dd_alpha,
-            num_classes=args.num_classes,
-        )
+    if args.iid:
+        split_file = f'/{args.dataset.upper()}_num_clients={args.num_users}_iid.json'
+        args.dd_alpha = -1.0
+        args.dir_p = -1.0
     else:
-        print("[Partitioning Via IID....]")
-        dict_users = sample_iid(
-            labels=np.array(dataset_train.train_labels),
-            num_users=args.num_users,
-        )
+        if args.dir_p > 0:
+            split_file = f'/{args.dataset.upper()}_num_clients={args.num_users}_p={args.dir_p}_alpha={args.dd_alpha}.json'
+        else:
+            split_file = f'/{args.dataset.upper()}_num_clients={args.num_users}_alpha={args.dd_alpha}.json'
+
+    args.split_file = os.path.join(os.path.dirname(__file__), "split_file" + split_file)
+
+    with open(args.split_file, 'r') as file:
+        file_data = json.load(file)
+    client_indices = file_data['client_idx']
+    dict_users = {idx: sub_lst for idx, sub_lst in enumerate(client_indices)}
+
 
 
 
@@ -137,59 +159,62 @@ if __name__ == '__main__':
     print('torchvision version: ', torchvision.__version__)
 
 
+    args.mode = "disabled" if args.mode != "online" else "online"
+    swanlab.init(
+        project=f'GraduatePaper_Baselines',
+        name=f"{args.method}_{args.dataset}_client{args.num_users}_dir{args.dd_alpha}_p{args.dir_p}_{args.model}_{args.local_ep}epochs_{args.local_bs}lbs_{args.lr}lr_{args.noise_rho}_{args.noise_tau}",
+        mode=args.mode,
+    )
+    swanlab_args = copy.deepcopy(args)
+    swanlab_args.True_Labels = None  # remove unpickable object
+    swanlab_args.Soft_labels = None  # remove unpickable object
+    swanlab_args.device = str(swanlab_args.device)
+
+    swanlab.config.update(swanlab_args)
+
+    print("########################## Add Label Noise #################################")
+
+    client_noise_map = {i: 0.0 for i in range(len(dict_users))}
+
+    # Count Global Noise
+    global_noise_sum = 0
+    global_label_sum = sum([len(dict_users[user]) for user in dict_users])
+    y_train = dataset_train.train_labels
+    y_train_noisy = copy.deepcopy(y_train)
+    clients_noise_ratio = [0.0] * len(dict_users)
+
+    if "symmetric" in args.noise_type_lst:
+        # Add Noise Follow FedCorr
+        gamma_s = np.random.binomial(1, args.noise_rho, len(dict_users))
+        gamma_c_initial = np.random.rand(len(dict_users))
+        gamma_c_initial = (1 - args.noise_tau) * gamma_c_initial + args.noise_tau
+        gamma_c = gamma_s * gamma_c_initial
+
+        for i in np.where(gamma_c > 0)[0]:
+            sample_idx = np.array(list(dict_users[i]))
+            prob = np.random.rand(len(sample_idx))
+            noisy_idx = np.where(prob <= gamma_c[i])[0]
+            for idx in noisy_idx:
+                y_train_noisy[sample_idx[idx]] = np.random.choice(
+                    [j for j in range(args.num_classes)]
+                )
+            noise_ratio = np.mean(np.array(y_train)[sample_idx] != np.array(y_train_noisy)[sample_idx])
+            clients_noise_ratio[i] = float(noise_ratio)
+            client_noise_map[i] = float(noise_ratio)
+            print(f'Client {i}, Noise Level: {gamma_c[i]:.4f}, Real Noise Ratio: {noise_ratio:.4f}')
+            global_noise_sum += len(noisy_idx)
+
+        # Ensure labels are Long/Int64 for PyTorch CrossEntropyLoss/NLLLoss
+        if isinstance(y_train_noisy, list):
+             y_train_noisy = np.array(y_train_noisy)
+        y_train_noisy = y_train_noisy.astype(np.int64)
+
+        dataset_train.train_labels = y_train_noisy
+
+        print(
+            f'Global Labels: {len(dataset_train.train_labels)}, Noisy Labels: {global_noise_sum}, Global Noise Rate: {global_noise_sum / len(dataset_train.train_labels):.4f}')
 
 
-
-    print("###########################################################")
-    client_noise_map= {}
-
-
-
-    ##############################
-    # Add label noise to data
-    ##############################
-    if sum(args.noise_group_num) != args.num_users:
-        exit('Error: sum of the number of noise group have to be equal the number of users')
-
-    if len(args.group_noise_rate) == 1:
-        args.group_noise_rate = args.group_noise_rate * 2
-
-    if not len(args.noise_group_num) == len(args.group_noise_rate) and \
-            len(args.group_noise_rate) * 2 == len(args.noise_type_lst):
-        exit('Error: The noise input is invalid.')
-
-    args.group_noise_rate = [(args.group_noise_rate[i * 2], args.group_noise_rate[i * 2 + 1])
-                             for i in range(len(args.group_noise_rate) // 2)]
-
-    user_noise_type_rates = []
-    for num_users_in_group, noise_type, (min_group_noise_rate, max_group_noise_rate) in zip(
-            args.noise_group_num, args.noise_type_lst, args.group_noise_rate):
-        noise_types = [noise_type] * num_users_in_group
-
-        step = (max_group_noise_rate - min_group_noise_rate) / \
-            num_users_in_group
-        noise_rates = np.array(range(num_users_in_group)) * \
-            step + min_group_noise_rate
-
-        user_noise_type_rates += [*zip(noise_types, noise_rates)]
-
-    for user, (user_noise_type, user_noise_rate) in enumerate(user_noise_type_rates):
-        if user_noise_type != "clean":
-            data_indices = list(copy.deepcopy(dict_users[user]))
-
-            client_noise_map[user] = user_noise_rate
-
-            # for reproduction
-            random.seed(args.seed)
-            random.shuffle(data_indices)
-
-            noise_index = int(len(data_indices) * user_noise_rate)
-
-            for d_idx in data_indices[:noise_index]:
-                true_label = dataset_train.train_labels[d_idx]
-                noisy_label = noisify_label(
-                    true_label, num_classes=args.num_classes, noise_type=user_noise_type)
-                dataset_train.train_labels[d_idx] = noisy_label
 
     logging_args = dict(
         batch_size=args.test_bs,
@@ -606,6 +631,15 @@ if __name__ == '__main__':
         # train_acc, train_loss = test_img(net_glob, log_train_data_loader, args)
         accuracy, test_loss, precision, recall, f1 = test_img(
             net_glob, test_loader, args)
+
+
+        swanlab.log({
+            "metric/global_model_accuracy": accuracy,
+            "metric/global_model_test_loss": test_loss,
+            "metric/global_model_precision": precision,
+            "metric/global_model_recall": recall,
+            "metric/global_model_f1": f1,
+        })
 
 
         acc_list_glob1.append(accuracy)

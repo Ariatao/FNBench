@@ -3,6 +3,7 @@ import argparse
 
 def args_parser():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", type=str, default='debug', choices=['debug', 'local', 'online'])
     # label noise method
     parser.add_argument('--method', type=str, default='fedavg',
                         choices=['fedavg', 'fedprox', 'fedexp', 'fedprox', 
@@ -13,7 +14,7 @@ def args_parser():
 
 
     # federated arguments
-    parser.add_argument('--epochs', type=int, default=120,
+    parser.add_argument('--epochs', type=int, default=1000,
                         help="rounds of training")
     parser.add_argument('--num_users', type=int,
                         default=100, help="number of users: K")
@@ -21,14 +22,14 @@ def args_parser():
                         help="the fraction of clients: C")
     parser.add_argument('--local_ep', type=int, default=5,
                         help="the number of local epochs: E")
-    parser.add_argument('--local_bs', type=int, default=64,
+    parser.add_argument('--local_bs', type=int, default=10,
                         help="local batch size: B")
     # parser.add_argument('--bs', type=int, default=64, help="test batch size")
     parser.add_argument('--test_bs', type=int, default=128,
                         help="test batch size")
 
     parser.add_argument('--lr', type=float, default=0.01, help="learning rate")
-    parser.add_argument('--momentum', type=float, default=0.9,
+    parser.add_argument('--momentum', type=float, default=0.5,
                         help="SGD momentum (default: 0.9)")
     parser.add_argument('--split', type=str, default='user',
                         help="train-test split type, user or sample")
@@ -42,6 +43,7 @@ def args_parser():
                         choices=['shard', 'dirichlet','IID'], default='IID')
     parser.add_argument('--dd_alpha', type=float, default=0.5,
                         help="dirichlet distribution alpha, you can select 1.0 or 0.5")
+    parser.add_argument('--dir_p', type=float, default=-1.0)
     parser.add_argument('--num_shards', type=int,
                         default=500, help="number of shards,eg: cifar-10:200 and cifar-100:2000 ")
 
@@ -51,7 +53,7 @@ def args_parser():
     # model arguments
     parser.add_argument('--model', type=str, default='resnet18',
                         choices=['resnet18', 'resnet34', 'resnet50', 'resnet20', 'fasttext'], help='model name')
-    parser.add_argument('--pretrained', action='store_false',
+    parser.add_argument('--pretrained', action='store_true',
                         help='if use pretrained model')
 
 
@@ -106,9 +108,9 @@ def args_parser():
     parser.add_argument('--n_gram_vocab', type=int,
                         default=100000, help='n_gram vocab size for fasttext')
 
-
-
-
+    # FedCorr noise arguments
+    parser.add_argument('--noise_rho', type=float, default=0.8, help="noise rho for FedCorr")
+    parser.add_argument('--noise_tau', type=float, default=0.5, help="noise tau for FedCorr")
 
     # SELFIE / Joint optimization arguments
     parser.add_argument('--queue_size', type=int,
