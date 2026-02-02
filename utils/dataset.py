@@ -20,13 +20,13 @@ def load_dataset(dataset):
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])],
+            transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
+                                 std=[0.2023, 0.1994, 0.2010])],
         )
         trans_cifar10_val = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])],
+            transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
+                                 std=[0.2023, 0.1994, 0.2010])],
         )
         #TODO: please load the dataset in advance to /FNBench/data/cifar10, etc
         dataset_train = CIFAR10(
@@ -48,13 +48,13 @@ def load_dataset(dataset):
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5071, 0.4867, 0.4408],
-                                 std=[0.2675, 0.2565, 0.2761])],
+            transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
+                                 std=[0.2023, 0.1994, 0.2010])],
         )
         trans_cifar100_val = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5071, 0.4867, 0.4408],
-                                 std=[0.2675, 0.2565, 0.2761])],
+            transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
+                                 std=[0.2023, 0.1994, 0.2010])],
         )
         dataset_train = CIFAR100(
             root='./data/cifar100',
