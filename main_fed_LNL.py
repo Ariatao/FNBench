@@ -168,6 +168,7 @@ if __name__ == '__main__':
     swanlab_args = copy.deepcopy(args)
     swanlab_args.True_Labels = None  # remove unpickable object
     swanlab_args.Soft_labels = None  # remove unpickable object
+    swanlab_args.collate_fn = None   # remove unpickable object
     swanlab_args.device = str(swanlab_args.device)
 
     swanlab.config.update(swanlab_args)

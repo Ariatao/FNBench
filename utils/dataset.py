@@ -4,7 +4,7 @@ from torch.nn.utils.rnn import pad_sequence
 from .cifar import CIFAR10, CIFAR100
 import os
 import numpy as np
-from .agnews import AGNews
+# from .agnews import AGNews
 
 def load_dataset(dataset):
     """
@@ -70,49 +70,49 @@ def load_dataset(dataset):
         )
         num_classes = 100
 
-    elif dataset == 'AGNews':
-        data_path = './data/agnews'
-        num_classes = 4
+    # elif dataset == 'AGNews':
+    #     data_path = './data/agnews'
+    #     num_classes = 4
         
 
-        trans_train = transforms.Compose([
-            transforms.Lambda(lambda x: x.lower()),  
-            transforms.Lambda(lambda x: x.strip()), 
-        ])
-        trans_val = transforms.Compose([
-            transforms.Lambda(lambda x: x.lower()),
-            transforms.Lambda(lambda x: x.strip()),
-        ])
+    #     trans_train = transforms.Compose([
+    #         transforms.Lambda(lambda x: x.lower()),  
+    #         transforms.Lambda(lambda x: x.strip()), 
+    #     ])
+    #     trans_val = transforms.Compose([
+    #         transforms.Lambda(lambda x: x.lower()),
+    #         transforms.Lambda(lambda x: x.strip()),
+    #     ])
         
 
-        dataset_train = AGNews(
-            root=data_path,
-            transform=trans_train,
-            mode='train'
-        )
+    #     dataset_train = AGNews(
+    #         root=data_path,
+    #         transform=trans_train,
+    #         mode='train'
+    #     )
         
 
-        dataset_test = AGNews(
-            root=data_path,
-            transform=trans_val,
-            mode='test',
-            vocab=dataset_train.get_vocab(),
-            tokenizer=dataset_train.get_tokenizer()
-        )
+    #     dataset_test = AGNews(
+    #         root=data_path,
+    #         transform=trans_val,
+    #         mode='test',
+    #         vocab=dataset_train.get_vocab(),
+    #         tokenizer=dataset_train.get_tokenizer()
+    #     )
         
-        # custom collate_fn for text 
-        def collate_fn(batch):
-            texts, labels = zip(*batch)
-            texts_padded = pad_sequence(texts, batch_first=True, padding_value=dataset_train.get_pad_idx())
-            labels = torch.tensor(labels, dtype=torch.long)
-            return texts_padded, labels
+    #     # custom collate_fn for text 
+    #     def collate_fn(batch):
+    #         texts, labels = zip(*batch)
+    #         texts_padded = pad_sequence(texts, batch_first=True, padding_value=dataset_train.get_pad_idx())
+    #         labels = torch.tensor(labels, dtype=torch.long)
+    #         return texts_padded, labels
 
-        n_train = len(dataset_train)
-        y_train = np.array(dataset_train.labels)
+    #     n_train = len(dataset_train)
+    #     y_train = np.array(dataset_train.train_labels)
         
-        print('[DATA] train labels size:', len(y_train))
-        print('[DATA] vocab size:', dataset_train.get_vocab_size())
-        # args.vocab_size = dataset_train.get_vocab_size()
+    #     print('[DATA] train labels size:', len(y_train))
+    #     print('[DATA] vocab size:', dataset_train.get_vocab_size())
+    #     args.vocab_size = dataset_train.get_vocab_size()
 
     else:
         raise NotImplementedError('Error: unrecognized dataset')
