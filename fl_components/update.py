@@ -468,7 +468,7 @@ class BaseLocalUpdate:
             self.net2.state_dict(), sum(epoch_loss2) / len(epoch_loss2)
 
     def forward_pass(self, batch, net, net2=None):
-        images, labels = batch
+        images, labels, *_ = batch
 
         # text
         if isinstance(images, torch.Tensor) and images.dim() == 2:  # text (but named with images), bad name!
@@ -2009,10 +2009,10 @@ class LocalUpdateDivideMix(BaseLocalUpdate):
         batch_loss = []
         for batch_idx, (inputs_x, inputs_x2, labels_x, w_x) in enumerate(labeled_trainloader):
             try:
-                inputs_u, inputs_u2 = unlabeled_train_iter.next()
+                inputs_u, inputs_u2 = next(unlabeled_train_iter)
             except:
                 unlabeled_train_iter = iter(unlabeled_trainloader)
-                inputs_u, inputs_u2 = unlabeled_train_iter.next()
+                inputs_u, inputs_u2 = next(unlabeled_train_iter)
 
             batch_size = inputs_x.size(0)
 
