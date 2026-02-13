@@ -26,6 +26,8 @@ from fl_components.update import get_local_update_objects
 from model_arch.build_model import build_model
 
 if __name__ == '__main__':
+    num_threads = 4
+    torch.set_num_threads(num_threads)
 
     start = time.time()
     args = args_parser()

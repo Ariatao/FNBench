@@ -381,7 +381,7 @@ class BaseLocalUpdate:
 
                 net.zero_grad()
 
-                # with autocast():
+                # with torch.amp.autocast(device_type='cuda'):
                 loss = self.forward_pass(batch, net)
                 
 
@@ -433,7 +433,7 @@ class BaseLocalUpdate:
                 net1.zero_grad()
                 net2.zero_grad()
 
-                # with autocast():
+                # with torch.amp.autocast(device_type='cuda'):
                 loss1, loss2 = self.forward_pass(batch, net1, net2)
 
                 loss1.backward()
@@ -576,7 +576,7 @@ class LocalUpdateSymmetric(BaseLocalUpdate):
                 self.batch_idx = batch_idx
                 net.zero_grad()
 
-                # with autocast():
+                # with torch.amp.autocast(device_type='cuda'):
                 loss = self.forward_pass(batch, net, criterion)
 
                 loss.backward()
@@ -609,7 +609,7 @@ class LocalUpdateSymmetric(BaseLocalUpdate):
         images = images.to(self.args.device)
         labels = labels.to(self.args.device)
 
-        with autocast():
+        with torch.amp.autocast(device_type='cuda'):
             log_probs, features = net(images)
         # loss = criterion(output, labels)
         loss = criterion(log_probs, labels)
@@ -702,7 +702,7 @@ class LocalUpdateClipping:
                 self.batch_idx = batch_idx
                 net.zero_grad()
 
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     loss = self.forward_pass(batch, net)
                 loss.backward()
 
@@ -830,7 +830,7 @@ class LocalUpdateFedProx:
                 self.batch_idx = batch_idx
                 net.zero_grad()
 
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     loss = self.forward_pass(batch, net)
 
                     proximal_term = 0.0
@@ -978,7 +978,7 @@ class LocalUpdateFedLSR(BaseLocalUpdate):
                 self.batch_idx = batch_idx
                 net.zero_grad()
 
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     loss = self.forward_pass(batch, net)
 
                 loss.backward()
@@ -1021,7 +1021,7 @@ class LocalUpdateFedLSR(BaseLocalUpdate):
         sm = torch.nn.Softmax(dim=1)
         lsm = torch.nn.LogSoftmax(dim=1)
 
-        with autocast():
+        with torch.amp.autocast(device_type='cuda'):
 
             output1, feat = net(images)  # make a forward pass
             output2, __ = net(images_aug)  # make a forward pass
@@ -1107,7 +1107,7 @@ class LocalUpdateFedRN(BaseLocalUpdate):
             for batch_idx, (inputs, targets, items, idxs) in enumerate(self.ldr_eval):
                 inputs, targets = inputs.to(
                     self.args.device), targets.to(self.args.device)
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     outputs,_ = self.net1(inputs)
                 y_pred = outputs.data.max(1, keepdim=True)[1]
                 correct += y_pred.eq(targets.data.view_as(y_pred)
@@ -1119,7 +1119,7 @@ class LocalUpdateFedRN(BaseLocalUpdate):
 
     def set_arbitrary_output(self):
         self.net1.to(self.args.device)
-        with autocast():
+        with torch.amp.autocast(device_type='cuda'):
             arbitrary_output,_ = self.net1(self.gaussian_noise.to(self.args.device))
         self.arbitrary_output = arbitrary_output
 
@@ -1139,7 +1139,7 @@ class LocalUpdateFedRN(BaseLocalUpdate):
             for batch_idx, (inputs, targets, items, idxs) in enumerate(self.ldr_eval):
                 inputs, targets = inputs.to(
                     self.args.device), targets.to(self.args.device)
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     outputs, _ = net(inputs)
                 loss = self.CE(outputs, targets)
                 losses.append(loss)
@@ -1205,7 +1205,7 @@ class LocalUpdateFedRN(BaseLocalUpdate):
                 neighbor_net.to(self.args.device)
                 neighbor_net.zero_grad()
 
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     outputs, _ = neighbor_net(inputs)
                 loss = self.loss_func(outputs, targets)
                 loss.backward()
@@ -1307,7 +1307,7 @@ class LocalUpdateRFL(BaseLocalUpdate):
             for batch_idx, (images, labels, idxs) in enumerate(self.ldr_train_tmp):
                 # if torch.cuda.is_available():
                 images, labels ,idxs= images.cuda(), labels.cuda(),idxs.cuda()
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     logit, feature = model(images)
                 self.pseudo_labels[idxs] = torch.argmax(logit)
                 if self.args.g_epoch == 0:
@@ -1333,7 +1333,7 @@ class LocalUpdateRFL(BaseLocalUpdate):
                 if torch.cuda.is_available():
                     images, labels = images.cuda(), labels.cuda()
                 
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     logit, feature = model(images)
                     # feature_copy = copy.deepcopy(feature)
                     
@@ -1482,7 +1482,7 @@ class LocalUpdateSELFIE(BaseLocalUpdate):
             )
             images = images.to(self.args.device)
             labels = labels.to(self.args.device)
-            with autocast():
+            with torch.amp.autocast(device_type='cuda'):
                 log_probs, _ = net(images)
             loss_array = self.loss_func(log_probs, labels)
 
@@ -1520,7 +1520,7 @@ class LocalUpdateSELFIE(BaseLocalUpdate):
                 self.batch_idx = batch_idx
                 net.zero_grad()
 
-                # with autocast():
+                # with torch.amp.autocast(device_type='cuda'):
                 loss = self.forward_pass(batch, net)
 
                 loss.backward()
@@ -1587,7 +1587,7 @@ class LocalUpdateJointOptim(BaseLocalUpdate):
                 self.batch_idx = batch_idx
                 net.zero_grad()
 
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     loss = self.forward_pass(batch, net)
 
                 loss.backward()
@@ -1622,7 +1622,7 @@ class LocalUpdateJointOptim(BaseLocalUpdate):
             labels = hard_labels.to(self.args.device)
         images = images.to(self.args.device)
 
-        # with autocast():
+        # with torch.amp.autocast(device_type='cuda'):
         logits, feat = net(images)
         probs = F.softmax(logits, dim=1)
 
@@ -1708,7 +1708,7 @@ class LocalUpdateCoteaching(BaseLocalUpdate):
                 self.batch_idx = batch_idx
                 net.zero_grad()
 
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     loss = self.forward_pass(batch, net)
 
                 loss.backward()
@@ -1757,7 +1757,7 @@ class LocalUpdateCoteaching(BaseLocalUpdate):
                 net1.zero_grad()
                 net2.zero_grad()
 
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     loss1, loss2 = self.forward_pass(batch, net1, net2)
 
                 loss1.backward()
@@ -2031,7 +2031,7 @@ class LocalUpdateDivideMix(BaseLocalUpdate):
 
             with torch.no_grad():
                 # label co-guessing of unlabeled samples
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     outputs_u11, _ = net(inputs_u)
                     outputs_u12, _ = net(inputs_u2)
                     outputs_u21, _ = net2(inputs_u)
@@ -2046,7 +2046,7 @@ class LocalUpdateDivideMix(BaseLocalUpdate):
                 targets_u = targets_u.detach()
 
                 # label refinement of labeled samples
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     outputs_x, _ = net(inputs_x)
                     outputs_x2, _ = net(inputs_x2)
 
@@ -2106,7 +2106,7 @@ class LocalUpdateDivideMix(BaseLocalUpdate):
                 inputs, targets = inputs.to(
                     self.args.device), targets.to(self.args.device)
                 
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     outputs,_ = model(inputs)
 
                 losses_lst.append(self.CE(outputs, targets))
@@ -2544,7 +2544,7 @@ class LocalUpdateFedELC(BaseLocalUpdate):
                 images = images.to(self.args.device)
                 labels = labels.to(self.args.device)
 
-                with autocast():
+                with torch.amp.autocast(device_type='cuda'):
                     logits, feat = net(images)
 
 
@@ -2605,7 +2605,7 @@ class LocalUpdateFedELC(BaseLocalUpdate):
             labels = labels.to(self.args.device)
             local_index = self.indexMapping(ids)
 
-            # with autocast():
+            # with torch.amp.autocast(device_type='cuda'):
             with torch.no_grad():
                 output_final, teacher_feat = net(images)
                 output_final = output_final.to('cpu')
