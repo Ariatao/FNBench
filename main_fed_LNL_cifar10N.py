@@ -184,7 +184,7 @@ if __name__ == '__main__':
     # Add label noise to data
     ##############################
 
-    noise_file = torch.load('./data/CIFAR-10_human.pt')
+    noise_file = torch.load('./data/CIFAR-10_human.pt', weights_only=False)
     clean_labels = noise_file['clean_label']
     worst_labels = noise_file['worse_label']
     aggre_labels = noise_file['aggre_label']

@@ -1984,6 +1984,14 @@ class LocalUpdateDivideMix(BaseLocalUpdate):
         optimizer = torch.optim.SGD(
             net.parameters(), lr=self.args.lr, momentum=self.args.momentum)
 
+        if len(label_idx) == 0:
+            print(f"Warning: label_idx is empty, skip training")
+            return 0.0
+
+        if len(unlabel_idx) == 0:
+            print(f"Warning: unlabel_idx is empty, skip training")
+            return 0.0
+
         # dataloader
         labeled_trainloader = DataLoader(
             PairProbDataset(self.dataset, label_idx, prob_dict),
