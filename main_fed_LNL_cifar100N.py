@@ -1,6 +1,8 @@
 import copy
+import json
 import numpy as np
 import random
+import swanlab
 import time
 from datetime import datetime
 import os
@@ -23,11 +25,14 @@ from fl_components.update import get_local_update_objects
 from model_arch.build_model import build_model
 
 if __name__ == '__main__':
+    num_threads = 4
+    torch.set_num_threads(num_threads)
 
     start = time.time()
     args = args_parser()
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
     args.device = torch.device(
-        'cuda:{}'.format(args.gpu)
+        'cuda'
         if torch.cuda.is_available() and args.gpu != -1
         else 'cpu',
     )
@@ -97,36 +102,52 @@ if __name__ == '__main__':
 
 
 
-    if args.partition == 'shard':  # non-iid
-        if(args.dataset == 'cifar10'):
-            # 5 classes for a client at most (total clients=100)
-            args.num_shards = 500
-        elif(args.dataset == 'cifar100'):
-            # 20 classes for a client at most (total clients=100)
-            args.num_shards = 2000
+    # if args.partition == 'shard':  # non-iid
+    #     if(args.dataset == 'cifar10'):
+    #         # 5 classes for a client at most (total clients=100)
+    #         args.num_shards = 500
+    #     elif(args.dataset == 'cifar100'):
+    #         # 20 classes for a client at most (total clients=100)
+    #         args.num_shards = 2000
 
-        print("[Partitioning Via Sharding....]")
-        dict_users = sample_noniid_shard(
-            labels=np.array(dataset_train.train_labels),
-            num_users=args.num_users,
-            num_shards=args.num_shards,
-        )
+    #     print("[Partitioning Via Sharding....]")
+    #     dict_users = sample_noniid_shard(
+    #         labels=np.array(dataset_train.train_labels),
+    #         num_users=args.num_users,
+    #         num_shards=args.num_shards,
+    #     )
 
-    elif args.partition == 'dirichlet':
-        print("[Partitioning Via Dir....]")
-        dict_users = sample_dirichlet(
-            labels=np.array(dataset_train.train_labels),
-            num_clients=args.num_users,
-            alpha=args.dd_alpha,
-            num_classes=args.num_classes,
-        )
+    # elif args.partition == 'dirichlet':
+    #     print("[Partitioning Via Dir....]")
+    #     dict_users = sample_dirichlet(
+    #         labels=np.array(dataset_train.train_labels),
+    #         num_clients=args.num_users,
+    #         alpha=args.dd_alpha,
+    #         num_classes=args.num_classes,
+    #     )
+    # else:
+    #     print("[Partitioning Via IID....]")
+    #     dict_users = sample_iid(
+    #         labels=np.array(dataset_train.train_labels),
+    #         num_users=args.num_users,
+    #     )
+
+    if args.iid:
+        split_file = f'/CIFAR100-N_num_clients={args.num_users}_iid.json'
+        args.dd_alpha = -1.0
+        args.dir_p = -1.0
     else:
-        print("[Partitioning Via IID....]")
-        dict_users = sample_iid(
-            labels=np.array(dataset_train.train_labels),
-            num_users=args.num_users,
-        )
+        if args.dir_p > 0:
+            split_file = f'/CIFAR100-N_num_clients={args.num_users}_p={args.dir_p}_alpha={args.dd_alpha}.json'
+        else:
+            split_file = f'/CIFAR100-N_num_clients={args.num_users}_alpha={args.dd_alpha}.json'
 
+    args.split_file = os.path.join(os.path.dirname(__file__), "split_file" + split_file)
+
+    with open(args.split_file, 'r') as file:
+        file_data = json.load(file)
+    client_indices = file_data['client_idx']
+    dict_users = {idx: sub_lst for idx, sub_lst in enumerate(client_indices)}
 
 
     print("#############   Print  all  args param. ##########")
@@ -139,17 +160,30 @@ if __name__ == '__main__':
     print('torchvision version: ', torchvision.__version__)
 
 
+    args.mode = "disabled" if args.mode != "online" else "online"
+    swanlab.init(
+        project=f'GraduatePaper_Baselines',
+        name=f"{args.method}_cifar100-n_client{args.num_users}_dir{args.dd_alpha}_p{args.dir_p}_{args.model}_{args.local_ep}epochs_{args.local_bs}lbs_{args.lr}lr_{args.noise_rho}_{args.noise_tau}",
+        mode=args.mode,
+    )
+    swanlab_args = copy.deepcopy(args)
+    swanlab_args.True_Labels = None  # remove unpickable object
+    swanlab_args.Soft_labels = None  # remove unpickable object
+    swanlab_args.collate_fn = None   # remove unpickable object
+    swanlab_args.device = str(swanlab_args.device)
+    swanlab_args.dataset = "cifar100-n"
 
+    swanlab.config.update(swanlab_args)
 
     print("###########################################################")
 
-    client_noise_map= {}
+    client_noise_map = {i: 0.0 for i in range(len(dict_users))}
 
     ##############################
     # Add label noise to data
     ##############################
 
-    noise_file = torch.load('./data/CIFAR-100_human.pt')
+    noise_file = torch.load('./data/CIFAR-100_human.pt', weights_only=False)
     clean_labels = noise_file['clean_label']
     worst_labels = noise_file['noisy_label']
     # aggre_labels = noise_file['aggre_label']
@@ -573,6 +607,14 @@ if __name__ == '__main__':
         # train_acc, train_loss = test_img(net_glob, log_train_data_loader, args)
         accuracy, test_loss, precision, recall, f1 = test_img(
             net_glob, test_loader, args)
+
+        swanlab.log({
+            "metric/global_model_accuracy": accuracy,
+            "metric/global_model_test_loss": test_loss,
+            "metric/global_model_precision": precision,
+            "metric/global_model_recall": recall,
+            "metric/global_model_f1": f1,
+        })
 
 
         acc_list_glob1.append(accuracy)
